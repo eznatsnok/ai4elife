@@ -71,11 +71,11 @@ def main():
     
     # parameters
     dataset_name = 'data'
-    desired_spacing = [4.0, 4.0, 4.0]
+    # # # # desired_spacing = [4.0, 4.0, 4.0]
 
     preprocessing_params = dict(
         data_path=input_dir, data_name=dataset_name, saving_dir=preprocessing_data_dir, save_3D=True,
-        output_resolution=[128, 128, 256], desired_spacing=desired_spacing, generate_mip=True
+        generate_mip=True, crop = False, crop_zero_above_brain = False
         )
 
     mip_data_dir = preprocessing.read_pet_gt_resize_crop_save_as_3d_andor_mip(**preprocessing_params)
