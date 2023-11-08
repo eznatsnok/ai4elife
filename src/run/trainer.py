@@ -765,6 +765,10 @@ class ModelTesting:
 
         # step 0:
         # Loss and dice on the validation of the forward system
+        print(input_image.shape)
+        print(h0_input.shape)
+        print(ground_truth.shape)
+     #   print([input_image, h0_input])
         loss, dice = self.model.combine_and_train.evaluate([input_image, h0_input], [ground_truth], verbose=verbose)
         all_loss_dice['loss_fwd_h0'].append(loss), all_loss_dice['dice__fwd_h0'].append(dice)
 

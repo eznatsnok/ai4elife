@@ -521,9 +521,9 @@ def read_pet_gt_resize_crop_save_as_3d_andor_mip(
             if data_name == "remarc":
                 gt = np.flip(gt, axis=-1)
 
-            # # # # gt = resize_nii_to_desired_spacing(
-            # # # #     gt, data_spacing=res_pet, desired_spacing=desired_spacing, interpolation_order_value=0
-            # # # #     )
+            gt = resize_nii_to_desired_spacing(
+                gt, data_spacing=res_pet, desired_spacing=desired_spacing, interpolation_order_value=0
+                )
 
         pet = np.asanyarray(pet.dataobj)
         # if the given image has stacked as channel example one image in remarc : 175x175x274x2
@@ -532,9 +532,9 @@ def read_pet_gt_resize_crop_save_as_3d_andor_mip(
 
         # generate_mip_show(pet, gt, identifier=str(image_name))
 
-        # # # pet = resize_nii_to_desired_spacing(
-        # # #     pet, data_spacing=res_pet, desired_spacing=desired_spacing, interpolation_order_value=3
-        # # #     )
+        pet = resize_nii_to_desired_spacing(
+            pet, data_spacing=res_pet, desired_spacing=desired_spacing, interpolation_order_value=3
+            )
 
         '''
         if most data are with brain images at the very top, avoid cropping the brain images,instead crop from bottom
@@ -607,27 +607,3 @@ def read_pet_gt_resize_crop_save_as_3d_andor_mip(
                         name=['pet_' + str(naming_)]
                         )
     return saving_dir_mip
-
-
-# if __name__ == '__main__':
-#     #how to run examples.
-#     # input_path = r"F:\Data\Remarc\REMARC/"
-#     # data_ = "remarc"
-    
-#     # input_path = r"F:\Data\Vienna\No_ground_truth/"
-#     # data_ = "LNH"
-#     # saving_dir_mip = read_pet_gt_resize_crop_save_as_3d_andor_mip(
-#     #     data_path=input_path, data_name=data_, saving_dir=None, save_3D=True, crop=False,
-#     #     output_resolution=[128, 128, 256], desired_spacing=None, generate_mip=True
-#     #     )
-#     # spacing = [2.0, 2.0, 3.0]
-#     # affine = np.diag([spacing[0], spacing[1], spacing[2], 1])
-#     # gt = nib.load("/data/home/hik37564/disk/lfb_net/for_ai4elife/data/input/0011f3deaf/gt/0011f3deaf.nii.gz").get_fdata()
-#     # mip = generate_mip_from_3D(gt, mip_axis=2) # entlang der körperhöhe
-#     # save_nii_images(mip, affine=affine, path_save="/data/home/hik37564/disk/lfb_net/for_ai4elife/data/output/data_default_MIP_dir", identifier="0011f3deaf",  name=['gt_' + str(naming_)])
-#     input_path = r"/data/home/hik37564/disk/lfb_net/for_ai4elife/data/input"
-#     data_ = "first_try"
-#    # desired_spacing = [2.0, 2.0, 3.0]
-#     saving_dir_mip = read_pet_gt_resize_crop_save_as_3d_andor_mip(
-#         data_path=input_path, data_name=data_, saving_dir="/data/home/hik37564/disk/lfb_net/for_ai4elife/data/output/data_default_MIP_dir", save_3D=True, crop=False,
-#         generate_mip=True, crop_zero_above_brain=False)
