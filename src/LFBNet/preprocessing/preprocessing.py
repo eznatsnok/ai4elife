@@ -389,8 +389,8 @@ def transform_coordinate_space(modality_1, modality_2, mode='nearest'):
 
 # read PET and GT images
 def read_pet_gt_resize_crop_save_as_3d_andor_mip(
-        data_path: str = None, data_name: str = None, saving_dir: str = None, save_3D: bool = False, crop: bool = False,
-        output_resolution: List[int] = None, generate_mip: bool = False, crop_zero_above_brain: bool = False
+        data_path: str = None, data_name: str = None, saving_dir: str = None, save_3D: bool = False, crop: bool = True,
+        output_resolution: List[int] = None, desired_spacing: List[float] = None, generate_mip: bool = False
         ):
     """ Read pet and ground truth images from teh input data path. It also apply resize, and cropping operations.
 
@@ -472,8 +472,8 @@ def read_pet_gt_resize_crop_save_as_3d_andor_mip(
         print("Continuing to read %d  cases" % len(case_ids))
 
     #  resize, to  given resolution
-    # # # # if desired_spacing is None:
-    # # # #     desired_spacing = [4.0, 4.0, 4.0]
+    if desired_spacing is None:
+        desired_spacing = [4.0, 4.0, 4.0]
 
     # print where will be saved the 3d and mip
     print("\n")
@@ -488,12 +488,11 @@ def read_pet_gt_resize_crop_save_as_3d_andor_mip(
         current_id = os.path.join(data_path, image_name)
         # read, resize, crop and save as 3D
         pet, gt = get_pet_gt(current_id)
-        affine = pet.affine
 
         # resolution
         res_pet = pet.header.get_zooms()
         res_pet = tuple([float(round(res, 2)) for res in list(res_pet[:3])])
-        # # # # affine = pet.affine
+        affine = pet.affine
         print(f'Size of the PET input image: {np.asanyarray(pet.dataobj).shape}')
 
         # if there is a ground truth:
@@ -545,6 +544,7 @@ def read_pet_gt_resize_crop_save_as_3d_andor_mip(
                 # flip left to right to mach lnh data to remarc
                 gt = np.flip(gt, axis=-1)
 
+        crop_zero_above_brain = True
         if crop_zero_above_brain:
             # remove all zero pixels just before the brian image
             xs, ys, zs = np.where(pet != 0)
@@ -573,7 +573,7 @@ def read_pet_gt_resize_crop_save_as_3d_andor_mip(
 
         if save_3D:
             # output image affine
-            # # # # affine = np.diag([desired_spacing[0], desired_spacing[1], desired_spacing[2], 1])
+            affine = np.diag([desired_spacing[0], desired_spacing[1], desired_spacing[2], 1])
             if gt is not None:
                 save_nii_images(
                     [pet, gt], affine=affine, path_save=saving_dir_3d, identifier=str(image_name),
@@ -597,13 +597,27 @@ def read_pet_gt_resize_crop_save_as_3d_andor_mip(
                     gt_mip = generate_mip_from_3D(gt, mip_axis=int(sagittal_coronal))  # gt mip
                     # save the generated MIP
                     save_nii_images(
-                        [pet_mip, gt_mip], affine = affine, path_save=saving_dir_mip, identifier=str(image_name),
+                        [pet_mip, gt_mip], affine, path_save=saving_dir_mip, identifier=str(image_name),
                         name=['pet_' + str(naming_), 'ground_truth_' + str(naming_)]
                         )
                 else:
                     # save the generated MIP
                     save_nii_images(
-                        [pet_mip], affine = affine, path_save=saving_dir_mip, identifier=str(image_name),
+                        [pet_mip], affine, path_save=saving_dir_mip, identifier=str(image_name),
                         name=['pet_' + str(naming_)]
                         )
     return saving_dir_mip
+
+
+# Read .nii files using itk
+if __name__ == '__main__':
+    # how to run examples.
+    # input_path = r"F:\Data\Remarc\REMARC/"
+    # data_ = "remarc"
+    #
+    input_path = r"F:\Data\Vienna\No_ground_truth/"
+    data_ = "LNH"
+    saving_dir_mip = read_pet_gt_resize_crop_save_as_3d_andor_mip(
+        data_path=input_path, data_name=data_, saving_dir=None, save_3D=True, crop=True,
+        output_resolution=[128, 128, 256], desired_spacing=None, generate_mip=True
+        )
