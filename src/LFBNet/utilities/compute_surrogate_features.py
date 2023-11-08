@@ -44,7 +44,7 @@ class ComputesTMTVsDmaxFromNii:
         case_ids = [index for index in os.listdir(self.data_path) if not str(index).endswith('csv')]
 
         # voxel size of the images is considered constant
-        voxel_size = [4.0, 4.0, 4.0]
+        # # # voxel_size = [4.0, 4.0, 4.0]
 
         def get_features(mask_to_compute_feature_on: ndarray = None):
             """ Computes the surrogate MTV and surrogate dissemination.
@@ -81,7 +81,7 @@ class ComputesTMTVsDmaxFromNii:
                 # get number of files ending with the identifier, i.e., predicted (prd) or ground truth (gt).
                 if str(self.get_identifier) in str(read_image):
                     read_image_path = os.path.join(img_folder, read_image)
-                    mask, _ = ComputesTMTVsDmaxFromNii.get_image(read_image_path)
+                    mask, voxel_size = ComputesTMTVsDmaxFromNii.get_image(read_image_path)
 
                     if saved_sagittal_coronal_separately:
                         # We have sagittal and coronal images saved separately.
@@ -100,7 +100,7 @@ class ComputesTMTVsDmaxFromNii:
 
             # combine the sagittal and coronal features, and compute them in physical space.
             sTMTV, sDmax_abs, sDmax_sqrt = ComputesTMTVsDmaxFromNii.compute_features_in_physical_space(
-                sagittal, coronal
+                sagittal, coronal, voxel_size=voxel_size
                 )
             # add the given patient's features into all dataset.
             case_name_sagittal_coronal_axial_x_y_z_features.append(
@@ -119,7 +119,7 @@ class ComputesTMTVsDmaxFromNii:
 
     @staticmethod
     def compute_features_in_physical_space(
-            sagittal: dict = None, coronal: dict = None, voxel_size=None
+            sagittal: dict = None, coronal: dict = None, voxel_size = None
             ):
         """ Compute features in physical space. Basically multiply the given TMV or dissemination by the voxel space.
 
@@ -133,8 +133,8 @@ class ComputesTMTVsDmaxFromNii:
 
         """
         # add the surrogate volume of the coronal and sagittal images.
-        if voxel_size is None:
-            voxel_size = [4.0, 4.0, 4.0]
+        # # # if voxel_size is None:
+        # # #     voxel_size = [4.0, 4.0, 4.0]
         sTMTV = (sagittal['smtv'] + coronal['smtv']) * voxel_size[0] * voxel_size[2]
 
         # add the dissemination of the coronal and sagittal images. Absolute distance.
@@ -254,8 +254,9 @@ class ComputesTMTVsDmaxFromNii:
         # get the nifti image
         mask = nib.load(img_mask_pt)
         # get the voxel spacing
-        voxel_size = mask.header.get_zooms()
-
+        # # # # voxel_size = mask.header.get_zooms()
+        affine = mask.affine
+        voxel_size = (abs(affine[0, 0]), abs(affine[1, 1]), abs(affine[2, 2]))
         mask = np.asanyarray(mask.dataobj)
         mask = ComputesTMTVsDmaxFromNii.threshold(mask)
         return mask, voxel_size
@@ -295,9 +296,3 @@ class ComputesTMTVsDmaxFromNii:
 
         print("Total data processed %0.3d" % len(data))
         print("CSV file saved to: ", dir)
-
-
-if __name__ == '__main__':
-    data_pth = r"E:\ai4elife\data\predicted/"
-    cls = ComputesTMTVsDmaxFromNii(data_path=data_pth, get_identifier="predicted")
-    cls.compute_and_save_surrogate_features()
