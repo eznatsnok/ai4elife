@@ -1,68 +1,98 @@
-""" Script to preprocess a given FDG PET image in .nii.
+"""script to predict the segmentation results and calculate surrogate biomarkers of a given testing dataset using the docker image.
+
+This script allows users to execute the whole pipeline using the docker image.
 """
-# Import libraries
-import glob
+
 import os
-
-import numpy as np
-from numpy import ndarray
-from numpy.random import seed
-from tqdm import tqdm
-from typing import List, Tuple
-import matplotlib.pyplot as plt
+import sys
 import warnings
+warnings.filterwarnings('ignore')
 
-from skimage.transform import resize
-import scipy.ndimage
-import nibabel as nib
-from scipy.ndimage import label
-
-# seed random number generator
-seed(1)
+from src.LFBNet.utilities import train_valid_paths
+from src.LFBNet.preprocessing import preprocessing
+from src.run import trainer, parse_argument
+from src.LFBNet.utilities.compute_surrogate_features import ComputesTMTVsDmaxFromNii
 
 
-def remove_outliers_in_sagittal(predicted):
-    """ when the sagittal image based segmentation does not have corresponding image in coronal remove it
+def main():
+    """ Predicts tumor segmentation results and calculates associated quantitative metrics on a given testing dataset.
+
+
+
+    This function receives the path directory to the testing dataset that contains the PET images. It predicts the
+
+    segmentation results and saves them as .nii files. It then calculates the surrogate metabolic tumor volume (sTMTV) and
+
+    surrogate dissemination feature (sDmax) and saves it as CSV or Xls file.
+
+    Acronyms:
+        PET: Nifti format of [18]F-FDG PET images in SUV unit.
+        GT: Ground truth mask from the expert if available.
+
+    [directory_path_to_raw 3D nifti data with SUV values] should have the following structure as:
+    main_dir:
+        -- patient_id_1:
+            -- PET
+                --give_name.nii or give_name.nii.gz
+            -- GT (if available) (Ground truth mask from the expert if available)
+                -- give_name.nii or give_name.nii.gz
+
+         -- patient_id_2:
+            -- PET
+                --give_name.nii or give_name.nii.gz
+            -- GT (if available)
+                -- give_name.nii or give_name.nii.gz
+
+    It reads the .nii files, resize, crop, and save the 3D data, then from these data it generates the sagittal and
+    coronal PET MIPs and the ground truth (mask from the expert) if available in the folder.
+
+    Get the latest trained model weight from './weight' directory and use that weight to predict the segmentation.
+
+    Returns:
+        save segmented images and computed surrogate biomarker features using the last weight saved in the ./weight
+        folder.
     """
-    sagittal = np.squeeze(predicted[0, ...])
-    coronal = np.squeeze(predicted[1, ...])
 
-    try:
-        sagittal = np.squeeze(sagittal)
-    except:
-        pass
+    # Path to the parent/main directory. Please read readme.md for how to organize your files.
+    input_dir = "/input"
 
-    try:
-        coronal = np.squeeze(coronal)
-    except:
-        pass
+    # parameters to set
+    dataset_name = 'data'
+    desired_spacing = [4.0, 4.0, 4.0]
 
-    binary_mask = sagittal.copy()
-    binary_mask[binary_mask >= 0.5] = 1
-    binary_mask[binary_mask < 0.5] = 0
-    coronal[coronal >= 0.5] = 1
-    coronal[coronal < 0.5] = 0
+    # path to the preprocessed data
+    preprocessing_data_dir = "/output"
 
-    labelled_mask, num_labels = label(binary_mask)
-    # Let us now remove all the small regions, i.e., less than the specified mm.
-    print(binary_mask.shape)
-    print(labelled_mask.shape)
-    print(coronal.shape)
-    for get_label in range(num_labels):
-        refined_mask = np.zeros(binary_mask.shape)
-        refined_mask[labelled_mask == get_label] = 1
-        x, y = np.nonzero(refined_mask)
-        x1, y1 = np.max(x), np.min(y)
-        x2, y2 = np.min(x), np.max(y)
-        refined_mask[:, y1-5:y2+5] = 1
-        if (refined_mask * coronal).sum() == 0:
-            binary_mask[labelled_mask == get_label] = 0
+    preprocessing_params = dict(
+        data_path=input_dir, data_name=dataset_name, saving_dir=preprocessing_data_dir, save_3D=True,
+        output_resolution=[128, 128, 256], desired_spacing=desired_spacing, generate_mip=True
+        )
+    mip_data_dir = preprocessing.read_pet_gt_resize_crop_save_as_3d_andor_mip(**preprocessing_params)
 
-    predicted[0, ...] = np.expand_dims(binary_mask, axis=-1)
+    # get list of all patient names from the generated mip directory
+    patient_id_list = os.listdir(mip_data_dir)
+    print('There are %d cases to evaluate \n' % len(patient_id_list))
 
-    return predicted
+    # prediction on the given testing dataset
+    test_params = dict(
+        preprocessed_dir=mip_data_dir, data_list=patient_id_list, predicted_dir=preprocessing_data_dir
+        )
+    network_run = trainer.ModelTesting(**test_params)
+    network_run.test()
+
+    print("\n\n Computing the surrogate biomarkers ... \n\n")
+    for identifier, data_path in zip(
+            ["predicted", "ground_truth"], [os.path.join(preprocessing_data_dir, "predicted_data"),
+                            os.path.join(preprocessing_data_dir, "data_default_MIP_dir")]
+            ):
+        try:
+            csv_file = ComputesTMTVsDmaxFromNii(data_path=data_path, get_identifier=identifier)
+            csv_file.compute_and_save_surrogate_features()
+        except:
+            continue
 
 
-# Read .nii files using itk
+# check
 if __name__ == '__main__':
-    print("remove wrong segmentation on sagittal views")
+    print("\n Running the integrated framework for testing use case... \n\n")
+    main()
