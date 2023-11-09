@@ -41,7 +41,7 @@ import ntpath
 from scipy.ndimage import label
 
 
-def superimpose_segmentation_images(pet_gt_prd_display, file_name, logzscore=None):
+def superimpose_segmentation_images(pet_gt_prd_display, file_name, logzscore=None, coronal_sagittal=0, only_dice_to_excel=False):
     """
 
     Args:
@@ -92,49 +92,59 @@ def superimpose_segmentation_images(pet_gt_prd_display, file_name, logzscore=Non
         prd_error[prd_error != 1] = 0
         dice = binary.dc(prd, gt)
         dice = np.round(dice * 100, 1)
+
+        csv="g_laufwerk/BA/Ergebnise/surrogate_predicted.csv"
+        df = pd.read_csv(csv)
+        if coronal_sagittal == 0:
+            df.loc[df['PID'] == file_name, 'Dice_sagittal'] = dice
+        else:
+            df.loc[df['PID'] == file_name, 'Dice_coronal'] = dice
+        df.to_csv(csv, index=False)
+
     else:
         dice = 'unkown'
 
-    color = ['brg']
-    hfont = {'fontname': 'Arial'}
-    fontsize_ = 12
-    for clr in color:
-        viridis = cm.get_cmap(clr)
-        print("\n Image ID: \t %s", str(file_name))
-        fig, axs = plt.subplots(1, 3, figsize=(10, 10))
-        axs[0].imshow(img, cmap='gray')
-        axs[0].set_title('PET image', **hfont, fontsize=fontsize_)
-        axs[0].set_xticklabels([])
-        axs[0].set_yticklabels([])
+    if not only_dice_to_excel:
+        color = ['brg']
+        hfont = {'fontname': 'Arial'}
+        fontsize_ = 12
+        for clr in color:
+            viridis = cm.get_cmap(clr)
+            print("\n Image ID: \t %s", str(file_name))
+            fig, axs = plt.subplots(1, 3, figsize=(10, 10))
+            axs[0].imshow(img, cmap='gray')
+            axs[0].set_title('PET image', **hfont, fontsize=fontsize_)
+            axs[0].set_xticklabels([])
+            axs[0].set_yticklabels([])
 
 
-        axs[1].imshow(img, cmap='gray')
-        if len(gt):
-            gt = np.ma.masked_where(gt == 0, gt)
-            axs[1].imshow(gt, cmap=viridis)  # cmap='gray')#
-            axs[1].set_title('Expert', **hfont, fontsize=fontsize_)
-        else:
-            axs[1].set_title('No ground truth provided', **hfont, fontsize=fontsize_)
-        axs[1].set_xticklabels([])
-        axs[1].set_yticklabels([])
-        axs[1].set_aspect('equal')
+            axs[1].imshow(img, cmap='gray')
+            if len(gt):
+                gt = np.ma.masked_where(gt == 0, gt)
+                axs[1].imshow(gt, cmap=viridis)  # cmap='gray')#
+                axs[1].set_title('Expert', **hfont, fontsize=fontsize_)
+            else:
+                axs[1].set_title('No ground truth provided', **hfont, fontsize=fontsize_)
+            axs[1].set_xticklabels([])
+            axs[1].set_yticklabels([])
+            axs[1].set_aspect('equal')
 
-        axs[2].imshow(img, cmap='gray')
-        if len(prd):
-            prd = np.ma.masked_where(prd==0, prd)
-            axs[2].imshow(prd,  viridis)
-            axs[2].set_title('CNN (Dice score: {dice}%)'.format(dice=dice), **hfont, fontsize=fontsize_)
-        else:
-            axs[2].set_title('predicted image not found'.format(dice=dice), **hfont, fontsize=fontsize_)
-        axs[2].set_xticklabels([])
-        axs[2].set_yticklabels([])
-        axs[2].set_aspect('equal')
+            axs[2].imshow(img, cmap='gray')
+            if len(prd):
+                prd = np.ma.masked_where(prd==0, prd)
+                axs[2].imshow(prd,  viridis)
+                axs[2].set_title('CNN (Dice score: {dice}%)'.format(dice=dice), **hfont, fontsize=fontsize_)
+            else:
+                axs[2].set_title('predicted image not found'.format(dice=dice), **hfont, fontsize=fontsize_)
+            axs[2].set_xticklabels([])
+            axs[2].set_yticklabels([])
+            axs[2].set_aspect('equal')
 
-        axs[0].axis('off')
-        axs[1].axis('off')
-        axs[2].axis('off')
-        # plt.savefig('images/' + str(file_name) + '.png', dpi=300)
-        plt.show()
+            axs[0].axis('off')
+            axs[1].axis('off')
+            axs[2].axis('off')
+            # plt.savefig('images/' + str(file_name) + '.png', dpi=300)
+            plt.show()
 
 
 def display_image(im_display: ndarray, identifier: str = None):
@@ -155,11 +165,11 @@ def display_image(im_display: ndarray, identifier: str = None):
     plt.show()
 
 
-def read_predicted_images(path: str = None):
+def read_predicted_images(path: str = None, only_dice_to_excel: bool = False):
     list_input_dir = os.listdir(path)
     print(f'Number of cases: {len(list_input_dir)}')
 
-    for file_name in list_input_dir:
+    for file_name in tqdm(list_input_dir):
         current_file = os.path.join(path, file_name)
         # read ct, gt, and pet, and pred
         pet_gt_prd = [ntpath.basename(nii) for nii in glob.glob(str(current_file) + "/*.nii")]
@@ -187,11 +197,33 @@ def read_predicted_images(path: str = None):
             else:
                 pet_gt_prd_display = [pet[coronal_sagittal], gt, pred]
 
-            superimpose_segmentation_images(pet_gt_prd_display, file_name=file_name)
+            superimpose_segmentation_images(pet_gt_prd_display, file_name=file_name, coronal_sagittal=coronal_sagittal, only_dice_to_excel=only_dice_to_excel)
         # except:
         #     pass
 
 
 if __name__ == '__main__':
-    # Function to visualize image and clinical data
-    print("visualize data")
+    # path = "/data/home/hik37564/disk/lfb_net/for_ai4elife/data/output/predicted_data/"
+    # read_predicted_images(path, only_dice_to_excel=True)
+
+    # # make csv to excel 
+    # # code = utf-8
+    # csv = "/data/home/hik37564/g_laufwerk/BA/Ergebnise/lfb_4x4x4_128x256.csv"
+    # df = pd.read_csv(csv, encoding='utf-8')
+    # df.to_excel("/data/home/hik37564/g_laufwerk/BA/Ergebnise/lfb_4x4x4_128x256.xlsx", index=False)
+
+
+    ## count images with different slices in pet and gt
+    df = pd.read_excel("/data/home/hik37564/g_laufwerk/BA/Ergebnise/voxel_sizes_org.xlsx")
+    for pat_id in tqdm(os.listdir("/data/home/hik37564/disk/lfb_net/for_ai4elife/data/output/data_default_3d_dir_")):
+        pet = nib.load(os.path.join("/data/home/hik37564/disk/lfb_net/for_ai4elife/data/output/data_default_3d_dir_", pat_id, "pet.nii"))
+        gt = nib.load(os.path.join("/data/home/hik37564/disk/lfb_net/for_ai4elife/data/output/data_default_3d_dir_", pat_id, "ground_truth.nii"))
+        if pet.header.get_zooms()[2] != gt.header.get_zooms()[2]:
+            data_to_add = {"PatID":str(pat_id), 
+                       "gt voxel_size": gt.header.get_zooms()[2],
+                        "pet voxel_size": pet.header.get_zooms()[2],
+                       }
+            new_row = pd.DataFrame(data_to_add, index=[0])
+            concated_df = pd.concat([df,new_row], ignore_index = True)
+            concated_df.to_excel("/data/home/hik37564/g_laufwerk/BA/Ergebnise/voxel_sizes_org.xlsx", index=False)
+      
